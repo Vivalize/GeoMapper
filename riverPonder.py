@@ -1,11 +1,11 @@
 import sys
-sys.path = ['/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python37.zip', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/lib-dynload', '/usr/local/lib/python3.7/site-packages', '/usr/local/Cellar/numpy/1.14.5_1/libexec/nose/lib/python3.7/site-packages']
+#sys.path = ['/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python37.zip', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/lib-dynload', '/usr/local/lib/python3.7/site-packages', '/usr/local/Cellar/numpy/1.14.5_1/libexec/nose/lib/python3.7/site-packages']
 
 import overpy
 import numpy as np
 import requests
 from osgeo import gdal
-from GeoGrapher import graphPolys
+import GeoGrapher as gg
 api = overpy.Overpass()
 
 terrainPath = None
@@ -52,19 +52,19 @@ def getElevation(lat, lon):
 					elevFinal = ((0.5+pixNSpor)*elevWE)+((0.5-pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
 				else:
 					elevFinal = ((1.5-pixNSpor)*elevWE)+((-0.5+pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
-			print(elevFinal)
 			return elevFinal
 
-def getRiverPointElevations(riverWays):
+def getRiverPointElevations(rivers):
 	finalRivers = []
-	for i in range(len(riverWays)):
-		way = riverWays[i]
+	count = 1
+	for way in rivers.ways:
 		finalRiver = []
 		nodes = way.get_nodes(resolve_missing=True)
-		for node in nodes: finalRiver.append([float(node.lat), float(node.lon), getElevation(node.lat, node.lon)])
-		print((str(i)+'/'+str(len(riverWays))), finalRiver[-1], finalRiver[0])
+		for node in nodes: finalRiver.append([float(node.lon), float(node.lat), getElevation(node.lat, node.lon)])
 		if finalRiver[-1][2] != None and finalRiver[0][2] != None and finalRiver[-1][2] > finalRiver[0][2]: finalRiver.reverse()
 		finalRivers.append(finalRiver)
+		print(count)
+		count += 1
 	return finalRivers
 	
 def getPonds(rivers):
@@ -74,7 +74,7 @@ def getPonds(rivers):
 		currentHigh = 0
 		inaPond = False
 		tempPond = []
-		for i in range(0, len(stepRiver)-1):
+		for i in range(len(stepRiver)):
 			if stepRiver[i][2] == None or stepRiver[i][2] > currentHigh:
 				if inaPond == True:
 					ponds.append(tempPond)
@@ -83,18 +83,19 @@ def getPonds(rivers):
 				currentHigh = stepRiver[i][2]
 			else:
 				inaPond = True
-				tempPond.append([stepRiver[i][1],stepRiver[i][0]])
+				tempPond.append([stepRiver[i][0],stepRiver[i][1]])
 	return ponds
 	
 	
 
 print("Downloading river data...")
-result = api.query("""way["waterway"](40.76,-123.155,40.792,-123.1);out;""")
-print("Finished downloading.")
+result = api.query("""way["waterway"](40.76,-123.155,40.792,-123.1);(._;>;);out;""")
 
-riverWays = result.ways
-finalRivers = getRiverPointElevations(riverWays)
+print('Processing river data...')
+finalRivers = getRiverPointElevations(result)
+
+print('Finding ponds...')
 possiblePonds = getPonds(finalRivers)
 
-
-			
+print('Graphing output...')
+gg.graphPolys(possiblePonds, outputName='Ponds.png', fillType='lines')
