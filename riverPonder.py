@@ -6,6 +6,7 @@ import numpy as np
 import requests
 from osgeo import gdal
 import GeoGrapher as gg
+import pickle
 api = overpy.Overpass()
 
 terrainPath = None
@@ -13,58 +14,71 @@ for i in sys.argv:
 	if i[-4:] == '.adf': terrainPath = i
 if terrainPath != None: terrainArray = gdal.Open(terrainPath).ReadAsArray()
 
+def save_obj(obj, name ):
+	with open('cache/'+ name + '.pkl', 'wb') as f:
+		pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+		
+def load_obj(name):
+	with open('cache/' + name + '.pkl', 'rb') as f:
+		return pickle.load(f)
+		
+elevCache = load_obj('elevations')
+
 def getElevation(lat, lon):
-	if terrainPath == None:
-		urlRequest = 'https://nationalmap.gov/epqs/pqs.php?x='+str(float(lon))+'&y='+str(float(lat))+'&units=feet&output=json'
-		req = requests.get(url = urlRequest)
-		return req.json()['USGS_Elevation_Point_Query_Service']['Elevation_Query']['Elevation']
+	key = str(lat)+':'+str(lon)
+	if key in elevCache: return elevCache[key]
 	else:
-		zone = terrainPath.split('/')[-2][3:-3]
-		eastSplit = zone.split('e')
-		westSplit = zone.split('w')
-		if len(eastSplit) > 1:
-			lonLeft = int(eastSplit[-1])
-			ns = eastSplit[0]
+		if terrainPath == None:
+			urlRequest = 'https://nationalmap.gov/epqs/pqs.php?x='+str(float(lon))+'&y='+str(float(lat))+'&units=feet&output=json'
+			req = requests.get(url = urlRequest)
+			elev = req.json()['USGS_Elevation_Point_Query_Service']['Elevation_Query']['Elevation']
+			elevCache[key] = elev
+			save_obj(elevCache, 'elevations')
+			return elev
 		else:
-			lonLeft = -1*int(westSplit[-1])
-			ns = westSplit[0]
-		lonRight = lonLeft + 1
-		if ns[0] == 'n': latTop = int(ns[1:])
-		else: latTop = -1*int(ns[1:])
-		latBottom = latTop - 1
-		
-		pixWE = float(((lon-lonLeft)/(lonRight-lonLeft))*np.shape(terrainArray)[1])
-		pixNS = float(((lat-latBottom)/(latTop-latBottom))*np.shape(terrainArray)[0])
-		
-		if pixWE < 0 or pixWE > np.shape(terrainArray)[1] or pixNS < 0 or pixNS > np.shape(terrainArray)[0]: return None
-		else:
-			pixWEpor = pixWE - int(pixWE)
-			pixNSpor = pixNS - int(pixNS)
-			if pixWEpor < 0.5:
-				elevWE = ((0.5+pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)]))+((0.5-pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)-1]))
-				if pixNSpor < 0.5:
-					elevFinal = ((0.5+pixNSpor)*elevWE)+((0.5-pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
-				else:
-					elevFinal = ((1.5-pixNSpor)*elevWE)+((-0.5+pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
+			zone = terrainPath.split('/')[-2][3:-3]
+			eastSplit = zone.split('e')
+			westSplit = zone.split('w')
+			if len(eastSplit) > 1:
+				lonLeft = int(eastSplit[-1])
+				ns = eastSplit[0]
 			else:
-				elevWE = ((1.5-pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)]))+((-0.5+pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)-1]))
-				if pixNSpor < 0.5:
-					elevFinal = ((0.5+pixNSpor)*elevWE)+((0.5-pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
+				lonLeft = -1*int(westSplit[-1])
+				ns = westSplit[0]
+			lonRight = lonLeft + 1
+			if ns[0] == 'n': latTop = int(ns[1:])
+			else: latTop = -1*int(ns[1:])
+			latBottom = latTop - 1
+			
+			pixWE = float(((lon-lonLeft)/(lonRight-lonLeft))*np.shape(terrainArray)[1])
+			pixNS = float(((lat-latBottom)/(latTop-latBottom))*np.shape(terrainArray)[0])
+			
+			if pixWE < 0 or pixWE > np.shape(terrainArray)[1] or pixNS < 0 or pixNS > np.shape(terrainArray)[0]: return None
+			else:
+				pixWEpor = pixWE - int(pixWE)
+				pixNSpor = pixNS - int(pixNS)
+				if pixWEpor < 0.5:
+					elevWE = ((0.5+pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)]))+((0.5-pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)-1]))
+					if pixNSpor < 0.5:
+						elevFinal = ((0.5+pixNSpor)*elevWE)+((0.5-pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
+					else:
+						elevFinal = ((1.5-pixNSpor)*elevWE)+((-0.5+pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
 				else:
-					elevFinal = ((1.5-pixNSpor)*elevWE)+((-0.5+pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
-			return elevFinal
+					elevWE = ((1.5-pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)]))+((-0.5+pixWEpor)*float(terrainArray[int(pixNS)][int(pixWE)-1]))
+					if pixNSpor < 0.5:
+						elevFinal = ((0.5+pixNSpor)*elevWE)+((0.5-pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
+					else:
+						elevFinal = ((1.5-pixNSpor)*elevWE)+((-0.5+pixNSpor)*float(terrainArray[int(pixNS)-1][int(pixWE)]))
+				return elevFinal
 
 def getRiverPointElevations(rivers):
 	finalRivers = []
-	count = 1
 	for way in rivers.ways:
 		finalRiver = []
 		nodes = way.get_nodes(resolve_missing=True)
 		for node in nodes: finalRiver.append([float(node.lon), float(node.lat), getElevation(node.lat, node.lon)])
 		if finalRiver[-1][2] != None and finalRiver[0][2] != None and finalRiver[-1][2] > finalRiver[0][2]: finalRiver.reverse()
 		finalRivers.append(finalRiver)
-		print(count)
-		count += 1
 	return finalRivers
 	
 def getPonds(rivers):
