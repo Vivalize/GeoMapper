@@ -92,7 +92,7 @@ for river in finalRivers:
 			currentHigh = stepRiver[i][2]
 		else:
 			inaPond = True
-			tempPond.append([stepRiver[i][0],stepRiver[i][1]])
+			tempPond.append([stepRiver[i][1],stepRiver[i][0]])
 			
 
 print(ponds)
