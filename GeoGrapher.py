@@ -33,8 +33,8 @@ def getGeoData(dataType):
 
 
 		
-def graphPolys(allPolys, bounds='Weaverville', color='white', outputName='Output.png', fillType='fill', showProg=False):
-	
+def graphPolys(allPolys, bounds='Weaverville', color='white', outputName='Output.png', fillType='fill', showProg=False, lineWidth = 5):
+
 	if allPolys == 'creeks': fillType = 'lines'
 	if isinstance(allPolys, str): allPolys = getGeoData(allPolys)
 	
@@ -60,7 +60,8 @@ def graphPolys(allPolys, bounds='Weaverville', color='white', outputName='Output
 	baseWidth, baseHeight = baseImage.size
 	draw = ImageDraw.Draw(baseImage)
 	
-	for poly in allPolys:
+	for i in range(len(allPolys)):
+		poly = allPolys[i]
 		polyInBounds = False
 		for coord in poly:
 			if coord[0] > minX and coord[0] < maxX and coord[1] > minY and coord[1] < maxY:
@@ -79,10 +80,10 @@ def graphPolys(allPolys, bounds='Weaverville', color='white', outputName='Output
 
 			# Draw the poly
 			if fillType == 'fill': draw.polygon(fixedPoly, fill=fillColor)
-			else: draw.line(fixedPoly, fill=fillColor, width=5)
+			else: draw.line(fixedPoly, fill=fillColor, width=lineWidth)
 		
-		if i%int(len(dataset[dataIndex])/1000)==0:
-			perc = str(i/len(dataset[dataIndex])*100)
+		if int(len(allPolys)/1000) != 0 and i%int(len(allPolys)/1000)==0:
+			perc = str(i/len(allPolys)*100)
 			if perc[1] == '.': print(perc[:3]+'%')
 			else: print(perc[:4]+'%')
 		if i%10000 == 0 and showProg: baseImage.show()
