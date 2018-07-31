@@ -1,14 +1,11 @@
 import sys
-#normSysPaths = ['/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python37.zip', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/lib-dynload', '/usr/local/lib/python3.7/site-packages', '/usr/local/Cellar/numpy/1.14.5_1/libexec/nose/lib/python3.7/site-packages']
-#for i in normSysPaths: sys.path.append(i)
 sys.path = ['/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python37.zip', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7', '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/lib-dynload', '/usr/local/lib/python3.7/site-packages', '/usr/local/Cellar/numpy/1.14.5_1/libexec/nose/lib/python3.7/site-packages']
 
 import overpy
 import numpy as np
 import requests
 from osgeo import gdal
-from PIL import Image, ImageDraw
-Image.MAX_IMAGE_PIXELS = 1000000000
+from GeoGrapher import graphPolys
 api = overpy.Overpass()
 
 terrainPath = None
@@ -69,6 +66,27 @@ def getRiverPointElevations(riverWays):
 		if finalRiver[-1][2] != None and finalRiver[0][2] != None and finalRiver[-1][2] > finalRiver[0][2]: finalRiver.reverse()
 		finalRivers.append(finalRiver)
 	return finalRivers
+	
+def getPonds(rivers):
+	ponds = []
+	for river in rivers:
+		stepRiver = list(reversed(river))
+		currentHigh = 0
+		inaPond = False
+		tempPond = []
+		for i in range(0, len(stepRiver)-1):
+			if stepRiver[i][2] == None or stepRiver[i][2] > currentHigh:
+				if inaPond == True:
+					ponds.append(tempPond)
+					tempPond = []
+				inaPond = False
+				currentHigh = stepRiver[i][2]
+			else:
+				inaPond = True
+				tempPond.append([stepRiver[i][1],stepRiver[i][0]])
+	return ponds
+	
+	
 
 print("Downloading river data...")
 result = api.query("""way["waterway"](40.76,-123.155,40.792,-123.1);out;""")
@@ -76,23 +94,7 @@ print("Finished downloading.")
 
 riverWays = result.ways
 finalRivers = getRiverPointElevations(riverWays)
+possiblePonds = getPonds(finalRivers)
 
-ponds = []
-for river in finalRivers:
-	stepRiver = list(reversed(river))
-	currentHigh = 0
-	inaPond = False
-	tempPond = []
-	for i in range(0, len(stepRiver)-1):
-		if stepRiver[i][2] == None or stepRiver[i][2] > currentHigh:
-			if inaPond == True:
-				ponds.append(tempPond)
-				tempPond = []
-			inaPond = False
-			currentHigh = stepRiver[i][2]
-		else:
-			inaPond = True
-			tempPond.append([stepRiver[i][1],stepRiver[i][0]])
+
 			
-
-print(ponds)
